@@ -8,6 +8,7 @@ def clean_extracted_text(text: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
+
 def extract_claim_id(text: str) -> str:
     """Extract CLM-YYYY-XXXX format claim reference."""
     match = re.search(r"CLM-\d{4}-\d{4}", text)
