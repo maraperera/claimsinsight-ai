@@ -1,18 +1,26 @@
 FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
-
 WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH="/app"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-pipeline.txt .
-RUN pip install --no-cache-dir -r requirements-pipeline.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-pipeline.txt
 
-COPY src/ ./src
-COPY scripts/ ./scripts
+COPY src/ /app/src/
+COPY scripts/ /app/scripts/
+COPY tests/ /app/tests/
+COPY docker/entrypoint.sh /app/entrypoint.sh
 
-CMD ["python", "scripts/run_pipeline_docker.py"]
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["pipeline"]

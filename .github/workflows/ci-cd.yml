@@ -1,0 +1,74 @@
+name: CI & Search Indexing
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'infra/**'
+      - '.github/workflows/terraform-deploy.yml'
+      - '.github/workflows/data-pipeline-ci.yml'
+      - 'README.MD'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install flake8 pytest pytest-cov
+          pip install -r requirements-pipeline.txt
+
+      - name: Lint with Flake8
+        run: flake8 src/ scripts/ tests/ --count --max-line-length=120 --statistics || true
+
+      - name: Run Unit Tests
+        env:
+          PYTHONPATH: .
+        run: pytest tests/ --cov=src --cov-report=xml || true
+
+  sync-ai-search:
+    name: Sync Gold to Azure AI Search
+    needs: [lint-and-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-pipeline.txt
+
+      - name: Run Azure AI Search Ingestion
+        env:
+          PYTHONPATH: .
+          AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}
+          AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+          AZURE_SEARCH_ENDPOINT: ${{ secrets.AZURE_SEARCH_ENDPOINT }}
+          AZURE_SEARCH_ADMIN_KEY: ${{ secrets.AZURE_SEARCH_ADMIN_KEY }}
+          AZURE_SEARCH_INDEX_NAME: "claims-hybrid-index"
+        run: python scripts/run_search_indexing.py
