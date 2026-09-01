@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 env:
-  ACR_NAME: claimsinsightcr
+  ACR_NAME: claimsinsightcr2026
   IMAGE_NAME: claims-pipeline-runner
 
 jobs:
