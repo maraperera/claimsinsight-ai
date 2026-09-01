@@ -59,7 +59,16 @@ for blob in raw_container.list_blobs(name_starts_with="incoming_claims/"):
             "ingested_at": datetime.utcnow().isoformat()
         })
 
-print(f"Bronze: Successfully loaded {len(bronze_records)} PDF binaries.")
+if bronze_records:
+    # Save the Bronze dataset (metadata table) to ADLS Gen2 bronze container
+    bronze_df = pd.DataFrame(bronze_records)
+    # Optional: If you don't want the full binary blob in parquet, drop raw_pdf_binary for the metadata table
+    bronze_meta_df = bronze_df.drop(columns=["raw_pdf_binary"])
+    bronze_parquet = bronze_meta_df.to_parquet(index=False)
+    bronze_container.upload_blob(name="delta/claims_bronze/data.parquet", data=bronze_parquet, overwrite=True)
+    print(f"Bronze: Successfully loaded and persisted {len(bronze_records)} claim records to bronze container.")
+else:
+    print("Bronze: No PDF files found in raw container.")
 
 # ---------------------------------------------------------
 # Step 2: SILVER LAYER (Parsing, Tokenizing & Chunking)
