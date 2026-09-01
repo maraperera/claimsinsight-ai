@@ -7,17 +7,15 @@ on:
         required: true
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   terraform:
     name: "Terraform Plan & Validate"
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: infra/terraform
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
