@@ -17,7 +17,7 @@ STORAGE_ACCOUNT = os.getenv("AZURE_STORAGE_ACCOUNT_NAME", "stclaimsinsight2026")
 STORAGE_KEY = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
 AOAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 AOAI_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-AOAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+AOAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-small")
 
 if not STORAGE_KEY:
     raise ValueError("AZURE_STORAGE_ACCOUNT_KEY environment variable is missing.")
