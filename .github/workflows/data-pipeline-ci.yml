@@ -1,0 +1,89 @@
+name: Claims Lakehouse CI/CD
+
+on:
+  push:
+    branches: [ main, staging ]
+    paths:
+      - 'databricks/**'
+      - 'src/pipeline_utils/**'
+      - 'tests/**'
+      - 'docker/Dockerfile.pipeline'
+      - 'infra/k8s/**'
+  pull_request:
+    branches: [ main ]
+
+env:
+  ACR_NAME: claimsinsightcr
+  IMAGE_NAME: claims-pipeline-runner
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install flake8 pytest pytest-cov
+          pip install -r requirements-pipeline.txt
+
+      - name: Lint with Flake8
+        run: flake8 src/ tests/ --count --max-line-length=120 --statistics
+
+      - name: Run Unit Tests
+        run: pytest tests/ --cov=src/pipeline_utils --cov-report=xml
+
+  build-and-push-docker:
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build and Push Pipeline Docker Image
+        run: |
+          docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} -f docker/Dockerfile.pipeline .
+          docker tag ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }} ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+
+  deploy-to-aks:
+    needs: build-and-push-docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: rg-claimsinsight-ai-prod
+          cluster-name: aks-claimsinsight-prod
+
+      - name: Deploy Kubernetes Manifests
+        run: |
+          kubectl apply -f infra/k8s/namespace.yaml
+          kubectl apply -f infra/k8s/configmap.yaml
+          sed -i 's|TAG_PLACEHOLDER|${{ github.sha }}|g' infra/k8s/cronjob-ingestion.yaml
+          kubectl apply -f infra/k8s/cronjob-ingestion.yaml
