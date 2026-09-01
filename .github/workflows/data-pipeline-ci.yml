@@ -5,12 +5,15 @@ on:
     branches: [ main, staging ]
     paths:
       - 'databricks/**'
-      - 'src/pipeline_utils/**'
+      - 'src/**'
       - 'tests/**'
-      - 'docker/Dockerfile.pipeline'
-      - 'infra/k8s/**'
+      - 'docker/**'
+      - 'infra/**'
+      - 'requirements*.txt'
+      - '.github/workflows/data-pipeline-ci.yml'
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 env:
   ACR_NAME: claimsinsightcr
@@ -31,6 +34,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          pip install --upgrade pip
           pip install flake8 pytest pytest-cov
           pip install -r requirements-pipeline.txt
 
@@ -39,6 +43,25 @@ jobs:
 
       - name: Run Unit Tests
         run: pytest tests/ --cov=src/pipeline_utils --cov-report=xml
+
+  sync-databricks-secrets:
+    needs: lint-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Databricks CLI
+        run: curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Configure Secret Scope in Databricks
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks secrets create-scope tac-claims-secrets || true
+          databricks secrets put-secret tac-claims-secrets storage-account-name --string-value "${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}"
+          databricks secrets put-secret tac-claims-secrets storage-account-key --string-value "${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}"
+          databricks secrets put-secret tac-claims-secrets azure-openai-endpoint --string-value "${{ secrets.AZURE_OPENAI_ENDPOINT }}"
+          databricks secrets put-secret tac-claims-secrets azure-openai-key --string-value "${{ secrets.AZURE_OPENAI_API_KEY }}"
 
   build-and-push-docker:
     needs: lint-and-test
@@ -78,7 +101,7 @@ jobs:
       - name: Set AKS Context
         uses: azure/aks-set-context@v3
         with:
-          resource-group: rg-claimsinsight-ai-prod
+          resource-group: rg-claimsinsight-prod
           cluster-name: aks-claimsinsight-prod
 
       - name: Deploy Kubernetes Manifests
