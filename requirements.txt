@@ -3,6 +3,7 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.7.0
 pydantic-settings>=2.2.0
+streamlit>=1.36.0
 
 # --- Azure & Cloud SDKs ---
 azure-identity>=1.16.0
