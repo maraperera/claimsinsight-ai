@@ -1,16 +1,10 @@
 name: "Terraform Infrastructure Deploy"
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "infra/terraform/**"
-  pull_request:
-    branches:
-      - main
-    paths:
-      - "infra/terraform/**"
+  workflow_call:
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
   workflow_dispatch:
 
 permissions:
@@ -21,11 +15,9 @@ jobs:
   terraform:
     name: "Terraform Plan & Validate"
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: infra/terraform
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

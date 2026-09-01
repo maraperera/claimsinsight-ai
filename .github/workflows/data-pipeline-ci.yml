@@ -3,13 +3,6 @@ name: Claims Lakehouse Docker CI/CD
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'scripts/**'
-      - 'tests/**'
-      - 'docker/**'
-      - 'requirements-pipeline.txt'
-      - '.github/workflows/data-pipeline-ci.yml'
   workflow_dispatch:
 
 env:
@@ -17,6 +10,13 @@ env:
   IMAGE_NAME: claims-pipeline-runner
 
 jobs:
+  # 1. Reusable Workflow Call
+  call-terraform:
+    uses: ./.github/workflows/terraform-deploy.yml
+    secrets:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+  # 2. Application Lint & Unit Tests (Runs in parallel)
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -43,8 +43,9 @@ jobs:
           PYTHONPATH: .
         run: pytest tests/ --cov=src/pipeline_utils --cov-report=xml || true
 
+  # 3. Docker Pipeline Execution
   build-push-and-execute:
-    needs: lint-and-test
+    needs: [lint-and-test, call-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -70,10 +71,12 @@ jobs:
           AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_EMBEDDING_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}
         run: |
           docker run --rm \
             -e AZURE_STORAGE_ACCOUNT_NAME="${{ env.AZURE_STORAGE_ACCOUNT_NAME }}" \
             -e AZURE_STORAGE_ACCOUNT_KEY="${{ env.AZURE_STORAGE_ACCOUNT_KEY }}" \
             -e AZURE_OPENAI_API_KEY="${{ env.AZURE_OPENAI_API_KEY }}" \
             -e AZURE_OPENAI_ENDPOINT="${{ env.AZURE_OPENAI_ENDPOINT }}" \
+            -e AZURE_OPENAI_EMBEDDING_DEPLOYMENT="${{ env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT }}" \
             ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
