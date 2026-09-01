@@ -41,7 +41,9 @@ jobs:
       - name: Lint with Flake8
         run: flake8 src/ tests/ --count --max-line-length=120 --statistics
 
-      - name: Run Unit Tests
+      - name: 
+        env:
+          PYTHONPATH: .
         run: pytest tests/ --cov=src/pipeline_utils --cov-report=xml
 
   sync-databricks-secrets:
