@@ -6,7 +6,6 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,8 +13,6 @@ COPY requirements-pipeline.txt .
 RUN pip install --no-cache-dir -r requirements-pipeline.txt
 
 COPY src/ ./src
-COPY databricks/ ./databricks
-COPY docker/entrypoint.sh .
-RUN chmod +x entrypoint.sh
+COPY scripts/ ./scripts
 
-ENTRYPOINT ["./entrypoint.sh"]
+CMD ["python", "scripts/run_pipeline_docker.py"]

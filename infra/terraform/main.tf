@@ -13,13 +13,13 @@ provider "azurerm" {
 }
 
 resource "azurerm_resource_group" "rg" {
-  name     = "rg-claimsinsight-ai-prod"
+  name     = "rg-claimsinsight-prod"
   location = "australiaeast"
 }
 
-# 1. Azure Data Lake Gen2
+# 1. ADLS Gen2 Storage Account & Containers
 resource "azurerm_storage_account" "datalake" {
-  name                     = "stclaimsinsightlake"
+  name                     = "stclaimsinsight2026"
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
@@ -33,12 +33,13 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "containers" {
   storage_account_id = azurerm_storage_account.datalake.id
 }
 
-# 2. Azure Databricks Workspace
-resource "azurerm_databricks_workspace" "databricks" {
-  name                = "dbw-claimsinsight-prod"
+# 2. Azure Container Registry (ACR)
+resource "azurerm_container_registry" "acr" {
+  name                = "claimsinsightcr2026"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  sku                 = "premium"
+  sku                 = "Standard"
+  admin_enabled       = true
 }
 
 # 3. Azure AI Search Service
@@ -47,31 +48,4 @@ resource "azurerm_search_service" "search" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   sku                 = "standard"
-}
-
-# 4. Azure Container Registry
-resource "azurerm_container_registry" "acr" {
-  name                = "claimsinsightcr"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
-  sku                 = "Standard"
-  admin_enabled       = true
-}
-
-# 5. Azure Kubernetes Service (AKS)
-resource "azurerm_kubernetes_cluster" "aks" {
-  name                = "aks-claimsinsight-prod"
-  location            = azurerm_resource_group.rg.location
-  resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "claimsinsight-aks"
-
-  default_node_pool {
-    name       = "systempool"
-    node_count = 2
-    vm_size    = "Standard_D2s_v5"
-  }
-
-  identity {
-    type = "SystemAssigned"
-  }
 }
