@@ -1,5 +1,6 @@
 import re
 
+
 def clean_extracted_text(text: str) -> str:
     """Normalize whitespace and remove non-printable characters."""
     if not text:
