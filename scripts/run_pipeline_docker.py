@@ -4,7 +4,7 @@ import hashlib
 from datetime import datetime
 from typing import List, Dict, Any
 
-import fitz  # PyMuPDF
+import pymupdf as fitz
 import tiktoken
 import pandas as pd
 from azure.storage.blob import BlobServiceClient
@@ -21,6 +21,10 @@ AOAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding
 
 if not STORAGE_KEY:
     raise ValueError("AZURE_STORAGE_ACCOUNT_KEY environment variable is missing.")
+
+# Normalize Azure OpenAI Endpoint (removes trailing slashes and common subpaths)
+if AOAI_ENDPOINT:
+    AOAI_ENDPOINT = re.sub(r"/openai/.*$", "", AOAI_ENDPOINT).rstrip("/")
 
 blob_service = BlobServiceClient(
     account_url=f"https://{STORAGE_ACCOUNT}.blob.core.windows.net",
@@ -39,11 +43,11 @@ for blob in raw_container.list_blobs(name_starts_with="incoming_claims/"):
     if blob.name.endswith(".pdf"):
         data = raw_container.get_blob_client(blob.name).download_blob().readall()
         doc_hash = hashlib.sha256(data).hexdigest()
-        
+
         path_parts = blob.name.split("/")
         category_folder = path_parts[1] if len(path_parts) > 2 else "general"
         filename = path_parts[-1]
-        
+
         bronze_records.append({
             "document_hash": doc_hash,
             "source_uri": f"abfss://raw@{STORAGE_ACCOUNT}.dfs.core.windows.net/{blob.name}",
@@ -161,10 +165,13 @@ print("\n--- Step 3: Processing Gold Embeddings ---")
 gold_container = blob_service.get_container_client("gold")
 
 if AOAI_KEY and AOAI_ENDPOINT and not silver_df.empty:
+    print(f"Connecting to OpenAI Endpoint: {AOAI_ENDPOINT}")
+    print(f"Targeting Deployment: {AOAI_DEPLOYMENT}")
+
     client = AzureOpenAI(
         azure_endpoint=AOAI_ENDPOINT,
         api_key=AOAI_KEY,
-        api_version="2024-02-15-preview"
+        api_version="2024-06-01"
     )
 
     texts = silver_df["chunk_text"].fillna("").tolist()
